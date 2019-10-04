@@ -2,18 +2,15 @@
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Function.h"
-#include "llvm/Pass.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/LoopUtils.h"
-#include "llvm/Transforms/Utils/Cloning.h"
-#include "llvm/Analysis/LoopInfo.h"
-#include "llvm/Analysis/ScalarEvolution.h"
-#include "llvm/Analysis/ScalarEvolutionExpressions.h"
-#include "llvm/Analysis/ScalarEvolutionExpander.h"
-
 #include "llvm/Bitcode/BitcodeWriter.h"
 
+#include "llvm/Pass.h"
+#include "llvm/Support/raw_ostream.h"
+
+#include "llvm/Transforms/Utils/Cloning.h"
+
 #include <typeinfo>
+#include <string>
 
 using namespace llvm;
 
@@ -125,8 +122,6 @@ void CloneUsedGlobalsAcrossModule(Function *F, Module *M, Module *NewM, ValueToV
 void CloneFunctionAcrossModule(Function *F, Module *M, ValueToValueMapTy &VMap) {
 
   CloneUsedGlobalsAcrossModule(F,F->getParent(),M,VMap);
-  
-  
 
   Function *NewF = Function::Create(cast<FunctionType>(F->getValueType()), F->getLinkage(),
                          F->getAddressSpace(), F->getName(), M);
@@ -166,35 +161,33 @@ void ExtractFunctionIntoFile(Module &M, std::string FName, std::string FilePath)
   }
 }
 
-
-
 namespace llvm {
 
-  // Hello2 - The second implementation with getAnalysisUsage implemented.
-  struct CrossModuleFunctionExtractor : public ModulePass {
-    static char ID; // Pass identification, replacement for typeid
-    CrossModuleFunctionExtractor() : ModulePass(ID) {
-      initializeCrossModuleFunctionExtractorPass(*PassRegistry::getPassRegistry());
-    }
 
-    bool runOnModule(Module &M) override {
-      ExtractFunctionIntoFile(M, FunctionName, Path+std::string("/")+FunctionName+std::string(".bc"));
-    }
+struct CrossModuleFunctionExtractor : public ModulePass {
+  static char ID;
 
+  CrossModuleFunctionExtractor() : ModulePass(ID) {
+    initializeCrossModuleFunctionExtractorPass(*PassRegistry::getPassRegistry());
+  }
+
+  bool runOnModule(Module &M) override {
+    ExtractFunctionIntoFile(M, FunctionName, Path);
+  }
+
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
     // We don't modify the program, so we preserve all analyses.
-    void getAnalysisUsage(AnalysisUsage &AU) const override {
-      AU.setPreservesAll();
-    }
+    AU.setPreservesAll();
+  }
+};
 
-  };
-
-ModulePass *createLoopSplittingPass() {
+ModulePass *createCrossModuleFunctionExtractorPass() {
   return new CrossModuleFunctionExtractor();
 }
 
 } //end namespace
 
 char CrossModuleFunctionExtractor::ID = 0;
-INITIALIZE_PASS(CrossModuleFunctionExtractor, "func-extractor", "Hello World Pass", false, false)
+INITIALIZE_PASS(CrossModuleFunctionExtractor, "func-extractor", "Extract functions into new module", false, false)
 
 
